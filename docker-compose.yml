@@ -1,0 +1,10 @@
+services:
+  ha-scene-generator:
+    image: nginx:alpine
+    container_name: ha-scene-generator
+    restart: unless-stopped
+    volumes:
+      - ./app/dist:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "8090:80"
