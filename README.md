@@ -4,7 +4,6 @@ Create Home Assistant light scenes by sampling colors from images. Select an are
 
 <img width="1410" height="972" alt="image" src="https://github.com/user-attachments/assets/3919c7ca-c07d-48e0-9486-b4e7a1200d91" />
 
-
 ## Features
 
 - Connect to Home Assistant via Long-Lived Access Token
@@ -15,6 +14,7 @@ Create Home Assistant light scenes by sampling colors from images. Select an are
 - Adjustable brightness slider
 - Auto-activates scene on creation
 - Clean, modern dark UI
+- **Lightweight Docker deployment** (~50MB image, ~10MB RAM at idle)
 
 ## Setup
 
@@ -22,7 +22,7 @@ Create Home Assistant light scenes by sampling colors from images. Select an are
 
 1. Clone the repo:
    ```bash
-   git clone https://github.com/yourusername/ha-scene-generator.git
+   git clone https://github.com/briankeefe/ha-scene-generator.git
    cd ha-scene-generator
    ```
 
@@ -51,7 +51,7 @@ Create Home Assistant light scenes by sampling colors from images. Select an are
 
 1. Clone the repo:
    ```bash
-   git clone https://github.com/yourusername/ha-scene-generator.git
+   git clone https://github.com/briankeefe/ha-scene-generator.git
    cd ha-scene-generator/app
    ```
 
