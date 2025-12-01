@@ -44,6 +44,53 @@ function getErrorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e)
 }
 
+// Assign entity to area via WebSocket API (required - REST API doesn't support entity registry updates)
+function assignEntityArea(entityId: string, areaId: string, token: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ha-ws`)
+    let msgId = 1
+
+    const timeout = setTimeout(() => {
+      ws.close()
+      reject(new Error('WebSocket timeout'))
+    }, 10000)
+
+    ws.onopen = () => {
+      // Wait for auth_required message
+    }
+
+    ws.onmessage = (event) => {
+      const msg = JSON.parse(event.data)
+
+      if (msg.type === 'auth_required') {
+        ws.send(JSON.stringify({ type: 'auth', access_token: token }))
+      } else if (msg.type === 'auth_ok') {
+        // Send entity registry update
+        ws.send(JSON.stringify({
+          id: msgId++,
+          type: 'config/entity_registry/update',
+          entity_id: entityId,
+          area_id: areaId
+        }))
+      } else if (msg.type === 'result') {
+        clearTimeout(timeout)
+        ws.close()
+        if (msg.success) {
+          resolve()
+        } else {
+          reject(new Error(msg.error?.message || 'Failed to assign area'))
+        }
+      }
+    }
+
+    ws.onerror = () => {
+      clearTimeout(timeout)
+      reject(new Error('WebSocket connection failed'))
+    }
+  })
+}
+
 // Convert RGB to HSL
 function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
   r /= 255; g /= 255; b /= 255
@@ -429,6 +476,11 @@ function App() {
           entities
         })
       })
+
+      // Assign scene to selected area via WebSocket API
+      if (selectedArea) {
+        await assignEntityArea(`scene.${sceneId}`, selectedArea, token)
+      }
 
       // Activate the scene
       await haFetch('/services/scene/turn_on', token, {
