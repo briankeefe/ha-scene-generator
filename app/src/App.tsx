@@ -69,7 +69,6 @@ const PRESETS = [
   { name: 'Forest Sunbeam', file: '/presets/forest-sunbeam.jpg' },
   { name: 'Cherry Blossoms', file: '/presets/cherry-blossoms.jpg' },
   { name: 'Coral Reef', file: '/presets/coral-reef.jpg' },
-  { name: 'Foggy Forest', file: '/presets/foggy-forest.jpg' },
   { name: 'Neon City', file: '/presets/neon-city.jpg' },
   { name: 'Aurora', file: '/presets/aurora.jpg' },
   { name: 'Autumn', file: '/presets/autumn.jpg' },
