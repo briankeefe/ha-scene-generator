@@ -430,18 +430,6 @@ function App() {
         })
       })
 
-      // Assign scene to the selected area
-      if (selectedArea) {
-        try {
-          await haFetch(`/config/entity_registry/scene.${sceneId}`, token, {
-            method: 'POST',
-            body: JSON.stringify({ area_id: selectedArea })
-          })
-        } catch {
-          // Area assignment is optional, don't fail the whole operation
-        }
-      }
-
       // Activate the scene
       await haFetch('/services/scene/turn_on', token, {
         method: 'POST',
