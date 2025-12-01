@@ -401,7 +401,7 @@ function App() {
   }
 
   const createScene = async () => {
-    const sceneId = sceneName.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+    const sceneId = sceneName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/_+$/, '')
 
     interface SceneEntity {
       state: string
@@ -420,15 +420,29 @@ function App() {
         }
       }
 
-      await haFetch('/services/scene/create', token, {
+      // Create persistent scene via config API (has unique ID, manageable in UI)
+      await haFetch(`/config/scene/config/${sceneId}`, token, {
         method: 'POST',
         body: JSON.stringify({
-          scene_id: sceneId,
-          snapshot_entities: [],
+          id: sceneId,
+          name: sceneName,
           entities
         })
       })
 
+      // Assign scene to the selected area
+      if (selectedArea) {
+        try {
+          await haFetch(`/config/entity_registry/scene.${sceneId}`, token, {
+            method: 'POST',
+            body: JSON.stringify({ area_id: selectedArea })
+          })
+        } catch {
+          // Area assignment is optional, don't fail the whole operation
+        }
+      }
+
+      // Activate the scene
       await haFetch('/services/scene/turn_on', token, {
         method: 'POST',
         body: JSON.stringify({
