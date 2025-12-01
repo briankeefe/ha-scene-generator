@@ -94,6 +94,10 @@ input:focus, select:focus {
   border-color: #06b6d4;
 }
 
+.brightness-label {
+  margin-top: 16px;
+}
+
 /* Brightness Slider */
 .brightness-slider {
   -webkit-appearance: none;

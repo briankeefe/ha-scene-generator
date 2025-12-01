@@ -1,6 +1,15 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import './App.css'
 
+// Constants
+const MAX_IMAGE_WIDTH = 500
+const MIN_DOT_DISTANCE = 0.12
+const EDGE_PADDING = 0.08
+const POSITION_RANGE = 1 - (EDGE_PADDING * 2)
+const MAX_POSITION_ATTEMPTS = 50
+const STATUS_TIMEOUT_MS = 5000
+const HIGHLIGHT_DURATION_MS = 1500
+
 interface Area {
   id: string
   name: string
@@ -12,6 +21,15 @@ interface Light {
   supports_color: boolean
 }
 
+interface HAState {
+  entity_id: string
+  attributes: {
+    friendly_name?: string
+    supported_color_modes?: string[]
+    is_hue_group?: boolean
+  }
+}
+
 interface SamplePoint {
   id: string
   x: number
@@ -19,8 +37,11 @@ interface SamplePoint {
   r: number
   g: number
   b: number
-  lightId: string
   lightName: string
+}
+
+function getErrorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e)
 }
 
 async function haFetch(endpoint: string, token: string, options: RequestInit = {}, asText = false) {
@@ -101,7 +122,7 @@ function App() {
       localStorage.setItem('ha-token', token)
       setStatus({ msg: 'Connected to Home Assistant', type: 'success', key: Date.now() })
     } catch (e) {
-      setStatus({ msg: `Connection failed: ${e}`, type: 'error', key: Date.now() })
+      setStatus({ msg: `Connection failed: ${getErrorMessage(e)}`, type: 'error', key: Date.now() })
     }
   }
 
@@ -120,13 +141,13 @@ function App() {
       }, true) as string
       const lightIds: string[] = JSON.parse(result)
 
-      const states = await haFetch('/states', token)
+      const states: HAState[] = await haFetch('/states', token)
       const lightsData = lightIds.map(id => {
-        const state = states.find((s: any) => s.entity_id === id)
+        const state = states.find(s => s.entity_id === id)
         return {
           entity_id: id,
           name: state?.attributes?.friendly_name || id,
-          supports_color: state?.attributes?.supported_color_modes?.some((m: string) =>
+          supports_color: state?.attributes?.supported_color_modes?.some(m =>
             ['rgb', 'rgbw', 'rgbww', 'hs', 'xy'].includes(m)
           ) || false,
           is_hue_group: state?.attributes?.is_hue_group === true
@@ -136,7 +157,7 @@ function App() {
       setLights(lightsData)
       setSelectedLights(new Set(lightsData.map(l => l.entity_id)))
     } catch (e) {
-      setStatus({ msg: `Failed to load lights: ${e}`, type: 'error', key: Date.now() })
+      setStatus({ msg: `Failed to load lights: ${getErrorMessage(e)}`, type: 'error', key: Date.now() })
     }
   }
 
@@ -144,11 +165,11 @@ function App() {
     const img = new Image()
     img.crossOrigin = 'anonymous'
     img.onload = () => {
-      const canvas = canvasRef.current!
-      const ctx = canvas.getContext('2d')!
+      const canvas = canvasRef.current
+      const ctx = canvas?.getContext('2d')
+      if (!canvas || !ctx) return
 
-      const maxW = 500
-      const scale = Math.min(1, maxW / img.width)
+      const scale = Math.min(1, MAX_IMAGE_WIDTH / img.width)
       canvas.width = img.width * scale
       canvas.height = img.height * scale
 
@@ -225,20 +246,18 @@ function App() {
       return
     }
 
-    const minDistance = 0.12 // Minimum distance between dots (as fraction of image)
     const positions: { x: number; y: number }[] = []
 
     const getValidPosition = (): { x: number; y: number } => {
-      for (let attempts = 0; attempts < 50; attempts++) {
-        const x = 0.08 + Math.random() * 0.84 // Keep away from edges
-        const y = 0.08 + Math.random() * 0.84
+      for (let attempts = 0; attempts < MAX_POSITION_ATTEMPTS; attempts++) {
+        const x = EDGE_PADDING + Math.random() * POSITION_RANGE
+        const y = EDGE_PADDING + Math.random() * POSITION_RANGE
         const tooClose = positions.some(
-          p => Math.hypot(p.x - x, p.y - y) < minDistance
+          p => Math.hypot(p.x - x, p.y - y) < MIN_DOT_DISTANCE
         )
         if (!tooClose) return { x, y }
       }
-      // Fallback if can't find non-overlapping position
-      return { x: 0.08 + Math.random() * 0.84, y: 0.08 + Math.random() * 0.84 }
+      return { x: EDGE_PADDING + Math.random() * POSITION_RANGE, y: EDGE_PADDING + Math.random() * POSITION_RANGE }
     }
 
     const newSamples: SamplePoint[] = selected.map(light => {
@@ -252,7 +271,6 @@ function App() {
         r,
         g,
         b,
-        lightId: light.entity_id,
         lightName: light.name
       }
     })
@@ -293,17 +311,19 @@ function App() {
     }
   }, [dragging, handleMouseMove, handleMouseUp])
 
-  // Auto-connect if token exists
+  // Auto-connect if token exists (run once on mount)
   useEffect(() => {
-    if (token && !connected) {
+    const savedToken = localStorage.getItem('ha-token')
+    if (savedToken) {
       connect()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Auto-dismiss status after 5 seconds
+  // Auto-dismiss status
   useEffect(() => {
     if (status) {
-      const timer = setTimeout(() => setStatus(null), 5000)
+      const timer = setTimeout(() => setStatus(null), STATUS_TIMEOUT_MS)
       return () => clearTimeout(timer)
     }
   }, [status])
@@ -323,10 +343,16 @@ function App() {
   const createScene = async () => {
     const sceneId = sceneName.toLowerCase().replace(/[^a-z0-9]+/g, '_')
 
+    interface SceneEntity {
+      state: string
+      rgb_color: [number, number, number]
+      brightness: number
+    }
+
     try {
-      const entities: Record<string, any> = {}
+      const entities: Record<string, SceneEntity> = {}
       for (const s of samples) {
-        entities[s.lightId] = {
+        entities[s.id] = {
           state: 'on',
           rgb_color: [s.r, s.g, s.b],
           brightness
@@ -342,7 +368,6 @@ function App() {
         })
       })
 
-      // Activate the newly created scene
       await haFetch('/services/scene/turn_on', token, {
         method: 'POST',
         body: JSON.stringify({
@@ -352,7 +377,7 @@ function App() {
 
       setStatus({ msg: `Scene "${sceneName}" created and activated! (scene.${sceneId})`, type: 'success', key: Date.now() })
     } catch (e) {
-      setStatus({ msg: `Failed to create scene: ${e}`, type: 'error', key: Date.now() })
+      setStatus({ msg: `Failed to create scene: ${getErrorMessage(e)}`, type: 'error', key: Date.now() })
     }
   }
 
@@ -421,7 +446,7 @@ function App() {
                 placeholder="My Image Scene"
               />
 
-              <label style={{ marginTop: 16 }}>Brightness ({Math.round(brightness / 255 * 100)}%)</label>
+              <label className="brightness-label">Brightness ({Math.round(brightness / 255 * 100)}%)</label>
               <input
                 type="range"
                 className="brightness-slider"
@@ -517,7 +542,7 @@ function App() {
                       title={s.lightName}
                       onClick={() => {
                         setHighlighted(s.id)
-                        setTimeout(() => setHighlighted(null), 1500)
+                        setTimeout(() => setHighlighted(null), HIGHLIGHT_DURATION_MS)
                       }}
                     >
                       <div
