@@ -2,7 +2,8 @@
 
 Create Home Assistant light scenes by sampling colors from images. Select an area, choose your lights, pick a preset image or upload your own, then drag color sample points to create the perfect ambiance.
 
-![Screenshot](screenshot.png)
+<img width="1410" height="972" alt="image" src="https://github.com/user-attachments/assets/3919c7ca-c07d-48e0-9486-b4e7a1200d91" />
+
 
 ## Features
 
